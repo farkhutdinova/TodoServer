@@ -1,8 +1,14 @@
 package com.udjee
 
+import com.udjee.auth.JwtService
+import com.udjee.auth.MySession
+import com.udjee.auth.hash
+import com.udjee.repository.DatabaseFactory
+import com.udjee.repository.TodoRepository
 import io.ktor.application.Application
 import io.ktor.application.install
 import io.ktor.auth.Authentication
+import io.ktor.auth.jwt.jwt
 import io.ktor.features.ContentNegotiation
 import io.ktor.gson.gson
 import io.ktor.locations.Locations
@@ -25,7 +31,24 @@ fun Application.module(testing: Boolean = false) {
         }
     }
 
+    DatabaseFactory.init()
+    val db = TodoRepository()
+
+    val jwtService = JwtService()
+    val hashFunction = { s: String -> hash(s) }
+
     install(Authentication) {
+        jwt("jwt") {
+            verifier(jwtService.verifier)
+            realm = "Todo Server"
+            validate {
+                val payload = it.payload
+                val claim = payload.getClaim("id")
+                val claimString = claim.asInt()
+                val user = db.findUser(claimString)
+                user
+            }
+        }
     }
 
     install(ContentNegotiation) {
@@ -36,6 +59,3 @@ fun Application.module(testing: Boolean = false) {
     routing {
     }
 }
-
-data class MySession(val count: Int = 0)
-
